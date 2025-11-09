@@ -5,7 +5,6 @@ import dev.langchain4j.memory.ChatMemory;
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;
 import dev.langchain4j.model.chat.ChatLanguageModel;
 import dev.langchain4j.model.googleai.GoogleAiGeminiChatModel;
-import dev.langchain4j.rag.content.retriever.ContentRetriever;
 import dev.langchain4j.service.AiServices;
 import jakarta.annotation.PostConstruct;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -30,59 +29,67 @@ public class LlmClientGemini {
 
     @PostConstruct
     public void init() {
-        String apiKey = System.getenv("GeminiKey");
-        if (apiKey == null || apiKey.isBlank()) {
-            Properties p = new Properties();
-            try (InputStream in = getClass().getResourceAsStream("/chat.properties")) {
-                if (in != null) {
-                    p.load(in);
-                    apiKey = p.getProperty("GeminiKey");
+        try {
+            String apiKey = System.getenv("GeminiKey");
+            if (apiKey == null || apiKey.isBlank()) {
+                Properties p = new Properties();
+                try (InputStream in = getClass().getResourceAsStream("/chat.properties")) {
+                    if (in != null) {
+                        p.load(in);
+                        apiKey = p.getProperty("GeminiKey");
+                    }
                 }
-            } catch (Exception e) {
-                log.error("Lecture chat.properties échouée", e);
             }
-        }
-        if (apiKey == null || apiKey.isBlank()) {
-            log.error("Clé Gemini absente.");
-            return;
-        }
+            if (apiKey == null || apiKey.isBlank()) {
+                log.error("Clé Gemini absente.");
+                return;
+            }
 
-        ChatLanguageModel model = GoogleAiGeminiChatModel.builder()
-                .apiKey(apiKey)
-                .modelName("gemini-1.5-flash")
-                .build();
-
-        chatMemory = MessageWindowChatMemory.withMaxMessages(12);
-
-        ContentRetriever retriever = (ragService != null) ? ragService.getContentRetriever() : null;
-
-        if (retriever != null) {
-            assistant = AiServices.builder(Assistant.class)
-                    .chatLanguageModel(model)
-                    .chatMemory(chatMemory)
-                    .contentRetriever(retriever)
+            ChatLanguageModel model = GoogleAiGeminiChatModel.builder()
+                    .apiKey(apiKey)
+                    .modelName("gemini-2.5-flash")
                     .build();
-            log.info("Assistant initialisé avec RAG.");
-        } else {
-            assistant = AiServices.builder(Assistant.class)
+
+            chatMemory = MessageWindowChatMemory.withMaxMessages(12);
+
+            var b = AiServices.builder(Assistant.class)
                     .chatLanguageModel(model)
-                    .chatMemory(chatMemory)
-                    .build();
-            log.info("Assistant initialisé sans RAG (retriever indisponible).");
+                    .chatMemory(chatMemory);
+
+            if (ragService != null && ragService.getContentRetriever() != null) {
+                b = b.contentRetriever(ragService.getContentRetriever());
+                log.info("Assistant avec RAG.");
+            } else {
+                log.info("Assistant sans RAG.");
+            }
+
+            assistant = b.build();
+        } catch (Exception e) {
+            log.error("Init LLM échec", e);
         }
     }
 
-    public void setSystemRole(String systemRole) {
-        if (chatMemory == null) return;
-        chatMemory.clear();
-        this.systemRole = systemRole;
-        if (systemRole != null && !systemRole.isBlank()) {
-            chatMemory.add(SystemMessage.from(systemRole));
+    public void setSystemRole(String role) {
+        systemRole = role;
+        if (chatMemory != null) {
+            chatMemory.clear();
+            if (role != null && !role.isBlank()) {
+                chatMemory.add(SystemMessage.from(role));
+            }
         }
     }
 
     public String chat(String question) {
-        if (assistant == null) return "Assistant non disponible (clé API manquante).";
+        if (assistant == null) return "Assistant indisponible.";
         return assistant.chat(question);
+    }
+
+    public void reset() {
+        if (chatMemory != null) {
+            chatMemory.clear();
+            if (systemRole != null && !systemRole.isBlank()) {
+                chatMemory.add(SystemMessage.from(systemRole));
+            }
+        }
     }
 }

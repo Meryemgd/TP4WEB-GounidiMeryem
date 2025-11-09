@@ -41,15 +41,15 @@
                     <h:panelGrid id="questionetreponse" columns="1">
                         <h:panelGroup>
                             <h:outputText value="Question :"/>
-                            <button onclick="copyToClipboard('question')">Copier question</button>
-                            <button onclick="toutEffacer()">Effacer question et réponse</button>
+                            <button type="button" onclick="copyToClipboard('question')">Copier question</button>
+                            <button type="button" onclick="toutEffacer()">Effacer question et réponse</button>
                         </h:panelGroup>
                         <h:inputTextarea id="question" value="#{bb.question}" title="Question"
                                          cols="50" rows="5"/>
                         <h:commandButton value="Envoyer la question" action="#{bb.envoyer}"/>
                         <h:panelGroup>
                             <h:outputText value="Réponse :"/>
-                            <button onclick="copyToClipboard('reponse')">Copier réponse</button>
+                            <button type="button" onclick="copyToClipboard('reponse')">Copier réponse</button>
                         </h:panelGroup>
                         <h:inputTextarea id="reponse" value="#{bb.reponse}" title="Réponse"
                                          cols="50" rows="15"/>
@@ -58,7 +58,7 @@
                 <h:panelGrid id="paneldroit" columns="1" style="vertical-align: top;">
                     <h:panelGroup>
                         <h:outputText value="Conversation :"/>
-                        <button onclick="copyToClipboard('conversation')">Copier conversation</button>
+                        <button type="button" onclick="copyToClipboard('conversation')">Copier conversation</button>
                     </h:panelGroup>
                     <h:inputTextarea id="conversation" rows="30" cols="50" readonly="true"
                                      value="#{bb.conversation}" title="Conversation entière"/>

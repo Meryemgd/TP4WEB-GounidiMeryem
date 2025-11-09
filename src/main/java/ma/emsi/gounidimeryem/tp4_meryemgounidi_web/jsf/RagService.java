@@ -27,53 +27,49 @@ import java.util.List;
 public class RagService {
 
     private static final Logger log = LoggerFactory.getLogger(RagService.class);
-
-    private EmbeddingModel embeddingModel;
-    private EmbeddingStore<TextSegment> embeddingStore;
     private ContentRetriever contentRetriever;
 
     @PostConstruct
     public void init() {
         try {
-            embeddingModel = HuggingFaceEmbeddingModel.builder()
+            EmbeddingModel embeddingModel = HuggingFaceEmbeddingModel.builder()
                     .modelId("sentence-transformers/all-MiniLM-L6-v2")
+                    .accessToken(System.getenv("HUGGING_FACE_API_KEY"))
                     .build();
-            embeddingStore = new InMemoryEmbeddingStore<>();
 
-            URL dirUrl = getClass().getClassLoader().getResource("documents");
-            if (dirUrl == null) {
-                log.error("Dossier resources/documents introuvable.");
+            EmbeddingStore<TextSegment> store = new InMemoryEmbeddingStore<>();
+
+            URL docsUrl = getClass().getClassLoader().getResource("documents");
+            if (docsUrl == null) {
+                log.warn("resources/documents introuvable.");
                 return;
             }
-            Path dirPath = Paths.get(dirUrl.toURI());
-            File[] pdfFiles = dirPath.toFile().listFiles(f -> f.getName().toLowerCase().endsWith(".pdf"));
-            if (pdfFiles == null || pdfFiles.length < 2) {
-                log.warn("Moins de 2 PDF trouvés. RAG limité.");
+            Path docsPath = Paths.get(docsUrl.toURI());
+            File[] pdfs = docsPath.toFile().listFiles(f -> f.getName().toLowerCase().endsWith(".pdf"));
+            if (pdfs == null || pdfs.length == 0) {
+                log.warn("Aucun PDF.");
+                return;
             }
 
             DocumentParser parser = new ApachePdfBoxDocumentParser();
-
-            for (File f : pdfFiles) {
-                log.info("Ingestion PDF: {}", f.getName());
-                Document doc = FileSystemDocumentLoader.loadDocument(f.toPath(), parser);
+            for (File pdf : pdfs) {
+                log.info("Ingestion {}", pdf.getName());
+                Document doc = FileSystemDocumentLoader.loadDocument(pdf.toPath(), parser);
                 List<TextSegment> segments = DocumentSplitters.recursive(300, 50).split(doc);
-                embeddingStore.addAll(
-                        embeddingModel.embedAll(segments).content(),
-                        segments
-                );
-                log.info("  {} segments ingérés.", segments.size());
+                store.addAll(embeddingModel.embedAll(segments).content(), segments);
+                log.info("  {} segments.", segments.size());
             }
 
             contentRetriever = EmbeddingStoreContentRetriever.builder()
-                    .embeddingStore(embeddingStore)
+                    .embeddingStore(store)
                     .embeddingModel(embeddingModel)
                     .maxResults(3)
-                    .minScore(0.60) // filtre basique
+                    .minScore(0.60)
                     .build();
 
             log.info("ContentRetriever prêt.");
         } catch (Exception e) {
-            log.error("Erreur init RAG", e);
+            log.error("Init RAG échec", e);
         }
     }
 
